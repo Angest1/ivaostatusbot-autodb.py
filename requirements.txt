@@ -1,0 +1,5 @@
+discord.py
+aiohttp
+numpy
+matplotlib
+mysql-connector-python
