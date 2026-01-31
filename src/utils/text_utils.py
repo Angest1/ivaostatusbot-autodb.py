@@ -12,7 +12,7 @@ def clean_route(route: str) -> str:
     
     # Regex for coordinates
     coord_regex = re.compile(
-        r"^(\d{2,4}[NS]\d{3,5}[EW]|\d{1,2}[NS]\d{1,3}[EW]|-?\d+(\.\d+)?,-?\d+(\.\d+)?)$",
+        r"^(\d{2,6}[NS]\d{3,7}[EW]|\d{1,2}[NS]\d{1,3}[EW]|-?\d+(\.\d+)?,-?\d+(\.\d+)?)$",
         re.VERBOSE
     )
     

@@ -4,6 +4,8 @@ Generates matplotlib charts with caching for daily, weekly, and monthly views.""
 
 import os
 import time
+import sys
+import ctypes
 import gc
 from collections import defaultdict
 from datetime import datetime
@@ -252,6 +254,14 @@ class ChartService:
             else:
                 ax.set_ylim(0, y_max * 1.10)
             
+            # Draw vertical line at 00:00 for realtime chart
+            if chart_type == "realtime" and "00:00" in times:
+                try:
+                    idx_00 = times.index("00:00")
+                    ax.axvline(x=idx_00, color=color_primary, linestyle="--", linewidth=1, alpha=0.7)
+                except ValueError:
+                    pass
+            
             ax.set_xlim(0, len(x_ext) - 1)
             
             # Set ticks
@@ -282,15 +292,17 @@ class ChartService:
                     labels.append(times[i])
             
             ax.set_xticks(ticks)
-            ax.set_xticklabels(labels, rotation=45, fontsize=10, color="white")
+            ax.set_xticklabels(labels, rotation=45, fontsize=10, color="white", fontweight="bold")
             
             # Y-axis on right
             ax.yaxis.tick_right()
             ax.yaxis.set_major_locator(mticker.MaxNLocator(integer=True))
+            for label in ax.get_yticklabels():
+                label.set_fontweight('bold')
             
             # Grid and legend
             ax.grid(True, linewidth=0.3, alpha=0.3)
-            ax.legend(loc="center left", frameon=False, fontsize=10)
+            ax.legend(loc="upper left", frameon=False, prop={'weight': 'bold', 'size': 8})
             
             # Style spines
             for side, spine in ax.spines.items():
@@ -309,6 +321,13 @@ class ChartService:
             plt.savefig(output, dpi=300, transparent=True)
             plt.close(fig)
             gc.collect()
+            
+            # Force memory release on Linux
+            if sys.platform == "linux":
+                try:
+                    ctypes.CDLL('libc.so.6').malloc_trim(0)
+                except Exception:
+                    pass
         
         # Update cache
         self._cache[cache_key] = output

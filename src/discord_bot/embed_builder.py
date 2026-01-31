@@ -58,21 +58,22 @@ class EmbedBuilder:
                 print(f"[ERROR] Error attaching realtime chart: {e}")
         
 
-        embed.add_field(
-            name=get_text(self.settings.lang, "domestic_flights", flag=self.settings.country_flag),
-            value=str(stats.domestic_flights),
-            inline=True
-        )
-        embed.add_field(
-            name=get_text(self.settings.lang, "intl_arrivals", world=self.settings.world_emoji),
-            value=str(stats.intl_arrivals),
-            inline=True
-        )
-        embed.add_field(
-            name=get_text(self.settings.lang, "intl_departures", world=self.settings.world_emoji_foreign),
-            value=str(stats.intl_departures),
-            inline=True
-        )
+        if stats.total_flights > 0:
+            embed.add_field(
+                name=get_text(self.settings.lang, "domestic_flights", flag=self.settings.country_flag),
+                value=str(stats.domestic_flights),
+                inline=True
+            )
+            embed.add_field(
+                name=get_text(self.settings.lang, "intl_arrivals", world=self.settings.world_emoji),
+                value=str(stats.intl_arrivals),
+                inline=True
+            )
+            embed.add_field(
+                name=get_text(self.settings.lang, "intl_departures", world=self.settings.world_emoji_foreign),
+                value=str(stats.intl_departures),
+                inline=True
+            )
         
 
         total_pob = stats.people_on_board_total
@@ -223,10 +224,18 @@ class EmbedBuilder:
         # Build detail text
         detail_text = ""
         if has_detail:
-            if highlight:
-                detail_text = f"***{dependency or current_atc.callsign}{freq_text}**{atis_text}*"
+            # Check if we should hide the detail line completely (redundant with callsign)
+            # Only if: name is same as callsign AND no atis text
+            # We ignore frequency presence here as user requested to hide it too if condition met.
+            effective_name = dependency or current_atc.callsign
+            
+            if effective_name == current_atc.callsign and not atis_text:
+                detail_text = ""
             else:
-                detail_text = f"*{dependency or current_atc.callsign}{freq_text}{atis_text}*"
+                if highlight:
+                    detail_text = f"***{effective_name}{freq_text}**{atis_text}*"
+                else:
+                    detail_text = f"*{effective_name}{freq_text}{atis_text}*"
         
         # Combine callsigns and detail
         reserved = len(detail_text) + (1 if detail_text else 0)
@@ -297,10 +306,16 @@ class EmbedBuilder:
                 is_local_dep = any(dep.startswith(p) for p in self.settings.country_prefixes) if dep else False
                 is_local_arr = any(arr.startswith(p) for p in self.settings.country_prefixes) if arr else False
                 
-                if dep and len(dep) == 4 and is_local_dep:
-                    counter[dep] += 1
-                if arr and len(arr) == 4 and is_local_arr:
-                    counter[arr] += 1
+                if dep == arr:
+                    # Same airport (e.g. patterns), count only once if local
+                    if dep and len(dep) == 4 and is_local_dep:
+                        counter[dep] += 1
+                else:
+                    # Different airports, count both if local
+                    if dep and len(dep) == 4 and is_local_dep:
+                        counter[dep] += 1
+                    if arr and len(arr) == 4 and is_local_arr:
+                        counter[arr] += 1
         
         most_common = counter.most_common(5)
         
