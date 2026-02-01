@@ -296,7 +296,9 @@ class EmbedBuilder:
         if not flights:
             return ""
             
-        counter = Counter()
+        # Store counts as [dep_count, arr_count]
+        airport_stats = {}
+        
         for flight in flights:
             # flight = (callsign, dep, arr, route, pob, aircraft)
             if len(flight) >= 3:
@@ -306,30 +308,35 @@ class EmbedBuilder:
                 is_local_dep = any(dep.startswith(p) for p in self.settings.country_prefixes) if dep else False
                 is_local_arr = any(arr.startswith(p) for p in self.settings.country_prefixes) if arr else False
                 
-                if dep == arr:
-                    # Same airport (e.g. patterns), count only once if local
-                    if dep and len(dep) == 4 and is_local_dep:
-                        counter[dep] += 1
-                else:
-                    # Different airports, count both if local
-                    if dep and len(dep) == 4 and is_local_dep:
-                        counter[dep] += 1
-                    if arr and len(arr) == 4 and is_local_arr:
-                        counter[arr] += 1
+                if dep and len(dep) == 4 and is_local_dep:
+                    if dep not in airport_stats:
+                        airport_stats[dep] = {'dep': 0, 'arr': 0}
+                    airport_stats[dep]['dep'] += 1
+                    
+                if arr and len(arr) == 4 and is_local_arr:
+                    if arr not in airport_stats:
+                        airport_stats[arr] = {'dep': 0, 'arr': 0}
+                    airport_stats[arr]['arr'] += 1
         
-        most_common = counter.most_common(5)
+        # Sort by total movements (dep + arr)
+        sorted_airports = sorted(
+            airport_stats.items(), 
+            key=lambda x: x[1]['dep'] + x[1]['arr'], 
+            reverse=True
+        )
         
-        if not most_common:
+        # Take top 3
+        top_3_items = sorted_airports[:3]
+        
+        if not top_3_items:
             return ""
             
-        parts = []
-        medals = ["🥇", "🥈", "🥉", "🎖️", "🎖️"]
-        
-        for i, (airport, count) in enumerate(most_common):
-            medal = medals[i]
-            parts.append(f"{medal} {airport}: {count}")
+        # Create tuple list for formatter (airport, dep, arr)
+        top_3_data = []
+        for airport, counts in top_3_items:
+            top_3_data.append((airport, counts['dep'], counts['arr']))
             
-        return " ".join(parts)
+        return self._format_top_airports_footer(top_3_data)
     
     def build_historical_embed(
         self,
@@ -393,4 +400,73 @@ class EmbedBuilder:
             inline=True
         )
         
+        # Build Consolidated Footer
+        footer_parts = []
+        
+        # 2. Top Pilots
+        if stats.top_pilots:
+            formatted_pilots = self._format_top_users(stats.top_pilots, "🥇", "🥈", "🥉")
+            if formatted_pilots:
+                pilot_label = get_text(self.settings.lang, 'pilots').replace("👨‍✈️ ", "").strip()
+                footer_parts.append(f"TOP {pilot_label}:\n{formatted_pilots}")
+
+        # 3. Top ATCs
+        if stats.top_atcs:
+            formatted_atcs = self._format_top_users(stats.top_atcs, "🥇", "🥈", "🥉")
+            if formatted_atcs:
+                atc_label = get_text(self.settings.lang, 'controllers').replace("📡 ", "").strip()
+                footer_parts.append(f"TOP {atc_label}:\n{formatted_atcs}")
+
+        if footer_parts:
+            embed.set_footer(text="\n".join(footer_parts))
+        
         return embed
+
+    def _format_top_airports_footer(self, top_airports: List[Tuple]) -> str:
+        """Format top airports list for footer."""
+        if not top_airports:
+            return ""
+            
+        parts = []
+        medals = ["🥇", "🥈", "🥉"]
+        
+        for i, (airport, dep_count, arr_count) in enumerate(top_airports):
+            if i >= 3: break
+            
+            medal = medals[i]
+            total = dep_count + arr_count
+            
+            entry = f"{medal} {airport}:"
+            
+            if dep_count > 0:
+                entry += f" 🛫 {dep_count}"
+                
+            if arr_count > 0:
+                entry += f" 🛬 {arr_count}"
+            
+            parts.append(entry)
+            
+        return "  | ".join(parts)
+
+    def _format_top_users(self, top_users: List[Tuple], *medals) -> str:
+        """
+        Format top users list.
+        top_users: List of (rank, user_id, minutes)
+        """
+        if not top_users:
+            return ""
+            
+        lines = []
+        if not medals:
+            medals = ("🥇", "🥈", "🥉")
+            
+        for i, (rank, user_id, minutes) in enumerate(top_users):
+            if i >= len(medals): break
+            
+            medal = medals[i]
+            time_str = format_hours_minutes(minutes)
+            
+            # Format: 🥇 USERID: 0h 0m
+            lines.append(f"{medal} {user_id}: {time_str}")
+            
+        return " |".join(lines)

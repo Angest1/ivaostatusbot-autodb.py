@@ -54,6 +54,29 @@ class ConsolidationService:
         if not db_stats:
             return None
 
+        # Fetch top airports
+        top_airports = self.db_service.get_top_airports(
+            start_time, 
+            list(prefixes), 
+            scope=scope, 
+            limit=3
+        )
+        
+        # Fetch top pilots and ATCs
+        top_pilots = self.db_service.get_top_pilots(
+            start_time,
+            list(prefixes),
+            scope=scope,
+            limit=3
+        )
+        
+        top_atcs = self.db_service.get_top_atcs(
+            start_time,
+            list(prefixes),
+            scope=scope,
+            limit=3
+        )
+
         # Create Statistics object directly from DB result
         # Note: Historical stats don't need active_flights/active_atcs lists usually, 
         # or we could leave them empty/None.
@@ -66,7 +89,10 @@ class ConsolidationService:
             people_on_board_total=db_stats.get("people_on_board_total", 0),
             flight_time_total_min=db_stats.get("flight_time_total_min", 0),
             atc_time_total_min=db_stats.get("atc_time_total_min", 0),
-            atc_count=db_stats.get("atc_count", 0) # Unique ATCs in period
+            atc_count=db_stats.get("atc_count", 0), # Unique ATCs in period
+            top_airports=top_airports,
+            top_pilots=top_pilots,
+            top_atcs=top_atcs
         )
     
     def consolidate_realtime(self, file_path: str) -> Optional[Statistics]:

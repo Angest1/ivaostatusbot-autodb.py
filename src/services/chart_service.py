@@ -80,8 +80,8 @@ class ChartService:
              # Start of today
             start_time = now.replace(hour=0, minute=0, second=0, microsecond=0)
         elif chart_type == "realtime":
-             # Last 24 hours
-             start_time = now - timedelta(hours=24)
+             # Last 26 hours (to ensure the first visible tick at index 1 is exactly -24h)
+             start_time = now - timedelta(hours=26)
         elif chart_type == "weekly":
              # Start of week (Monday)
             start_time = (now - timedelta(days=now.weekday())).replace(hour=0, minute=0, second=0, microsecond=0)
@@ -144,7 +144,6 @@ class ChartService:
                 else:
                     return [], [], []
 
-            # Sort rows by timestamp to guarantee order (database usually does it, but strict safety)
             # Row: timestamp, pilot_count, atc_count
             rows.sort(key=lambda x: x[0])
 
@@ -256,8 +255,11 @@ class ChartService:
             # Draw vertical line at 00:00 for realtime chart
             if chart_type == "realtime" and "00:00" in times:
                 try:
-                    idx_00 = times.index("00:00")
-                    ax.axvline(x=idx_00, color=color_primary, linestyle="--", linewidth=1, alpha=0.7)
+                    # Find and use the last occurrence of "00:00" (most recent midnight)
+                    midnight_indices = [i for i, t in enumerate(times) if t == "00:00"]
+                    if midnight_indices:
+                        idx_00 = midnight_indices[-1]
+                        ax.axvline(x=idx_00, color=color_primary, linestyle="--", linewidth=1, alpha=0.7)
                 except ValueError:
                     pass
             
@@ -285,7 +287,11 @@ class ChartService:
                     labels.append(times[-1])
             else:
                 # Realtime/daily - show ~12 time labels
-                step = max(1, n // 12)
+                # For realtime (26h range), divide by 13 to get 2h steps (so index 1 is -24h)
+                if chart_type == "realtime":
+                    step = max(1, n // 13)
+                else:
+                    step = max(1, n // 12)
                 for i in range(step, n, step):
                     ticks.append(i)
                     labels.append(times[i])
@@ -309,7 +315,7 @@ class ChartService:
             
             # Grid and legend
             ax.grid(True, linewidth=0.3, alpha=0.3)
-            ax.legend(loc="center left", frameon=False, prop={'weight': 'bold', 'size': 8})
+            ax.legend(loc="upper left", frameon=False, prop={'weight': 'bold', 'size': 8})
             
             # Style spines
             for side, spine in ax.spines.items():

@@ -535,6 +535,189 @@ class DatabaseService:
             if conn:
                 conn.close()
 
+    def get_top_airports(self, start_time: datetime, country_prefixes: List[str], scope: str = 'day', limit: int = 3) -> List[tuple]:
+        """
+        Get top airports by movement (dep + arr) matching country prefixes.
+        Returns list of (airport_code, dep_count, arr_count).
+        """
+        conn = self.get_connection()
+        if not conn:
+            return []
+            
+        cursor = None
+        try:
+            cursor = conn.cursor()
+            
+            t_snap = f"snapshots_{scope}"
+            t_pilots = f"pilots_{scope}"
+            
+            # Helper to generate prefix check SQL
+            def prefix_clause(col):
+                pk = [f"{col} LIKE '{p}%'" for p in country_prefixes]
+                return f"({' OR '.join(pk)})"
+            
+            dep_check = prefix_clause("p.departure")
+            arr_check = prefix_clause("p.arrival")
+            
+            # Strategy:
+            # 1. Select Dep counts per airport (where airport matches prefixes)
+            # 2. Select Arr counts per airport (where airport matches prefixes)
+            # 3. Union and sum up
+            
+            query = f"""
+                SELECT 
+                    airport,
+                    SUM(dep_count) as total_deps,
+                    SUM(arr_count) as total_arrs,
+                    (SUM(dep_count) + SUM(arr_count)) as total_movements
+                FROM (
+                    -- Departures
+                    SELECT 
+                        p.departure as airport,
+                        COUNT(DISTINCT CONCAT(p.user_id, p.departure, p.arrival, p.route)) as dep_count,
+                        0 as arr_count
+                    FROM {t_snap} s
+                    JOIN {t_pilots} p ON s.id = p.snapshot_id
+                    WHERE s.timestamp >= %s
+                    AND {dep_check}
+                    GROUP BY p.departure
+                    
+                    UNION ALL
+                    
+                    -- Arrivals
+                    SELECT 
+                        p.arrival as airport,
+                        0 as dep_count,
+                        COUNT(DISTINCT CONCAT(p.user_id, p.departure, p.arrival, p.route)) as arr_count
+                    FROM {t_snap} s
+                    JOIN {t_pilots} p ON s.id = p.snapshot_id
+                    WHERE s.timestamp >= %s
+                    AND {arr_check}
+                    GROUP BY p.arrival
+                ) as combined
+                GROUP BY airport
+                ORDER BY total_movements DESC
+                LIMIT %s
+            """
+            
+            cursor.execute(query, (start_time, start_time, limit))
+            # Returns [(airport, deps, arrs, total), ...]
+            # We only need (airport, deps, arrs) for the medals, but total is good for sorting debug
+            results = []
+            for row in cursor.fetchall():
+                results.append((row[0], int(row[1]), int(row[2])))
+                
+            return results
+            
+        except mysql.connector.Error as err:
+            print(f"[ERROR] Error getting top airports: {err}")
+            return []
+        finally:
+            if cursor:
+                cursor.close()
+            if conn:
+                conn.close()
+
+    def get_top_pilots(self, start_time: datetime, country_prefixes: List[str], scope: str = 'day', limit: int = 3) -> List[tuple]:
+        """
+        Get top pilots by count of snapshots (minutes) where they were active.
+        Returns list of (rank, user_id, total_minutes).
+        """
+        conn = self.get_connection()
+        if not conn:
+            return []
+            
+        cursor = None
+        try:
+            cursor = conn.cursor()
+            
+            t_snap = f"snapshots_{scope}"
+            t_pilots = f"pilots_{scope}"
+            
+            # Determine prefix clauses for pilots
+            # Pilots are counted if they depart OR arrive in the country
+            # departure LIKE 'SC%' OR arrival LIKE 'SC%' ...
+            
+            prefix_clauses_dep = [f"p.departure LIKE '{p}%'" for p in country_prefixes]
+            prefix_clauses_arr = [f"p.arrival LIKE '{p}%'" for p in country_prefixes]
+            country_check = f"({' OR '.join(prefix_clauses_dep + prefix_clauses_arr)})"
+
+            # Count distinct snapshot timestamps (minutes) per pilot
+            # Note: We assume 1 snapshot = 1 minute roughly.
+            query = f"""
+                SELECT 
+                    p.user_id,
+                    COUNT(DISTINCT s.timestamp) as total_minutes
+                FROM {t_snap} s
+                JOIN {t_pilots} p ON s.id = p.snapshot_id
+                WHERE s.timestamp >= %s
+                AND {country_check}
+                GROUP BY p.user_id
+                ORDER BY total_minutes DESC
+                LIMIT %s
+            """
+            
+            cursor.execute(query, (start_time, limit))
+            results = []
+            for i, row in enumerate(cursor.fetchall()):
+                # row = (user_id, total_minutes)
+                results.append((i+1, row[0], int(row[1])))
+            return results
+        except mysql.connector.Error as err:
+            print(f"[ERROR] Error getting top pilots: {err}")
+            return []
+        finally:
+            if cursor: cursor.close()
+            if conn: conn.close()
+            
+    def get_top_atcs(self, start_time: datetime, country_prefixes: List[str], scope: str = 'day', limit: int = 3) -> List[tuple]:
+        """
+        Get top ATCs by time online.
+        Returns list of (rank, callsign, total_minutes).
+        """
+        conn = self.get_connection()
+        if not conn:
+            return []
+            
+        cursor = None
+        try:
+            cursor = conn.cursor()
+            
+            t_snap = f"snapshots_{scope}"
+            t_atcs = f"atcs_{scope}"
+            
+            # Country check for ATCs: callsign starts with prefix
+            prefix_clauses = [f"a.callsign LIKE '{p}%'" for p in country_prefixes]
+            country_check = f"({' OR '.join(prefix_clauses)})"
+            
+            query = f"""
+                SELECT 
+                    a.user_id,
+                    COUNT(DISTINCT s.timestamp) as total_minutes
+                FROM {t_snap} s
+                JOIN {t_atcs} a ON s.id = a.snapshot_id
+                WHERE s.timestamp >= %s
+                AND {country_check}
+                AND a.user_id IS NOT NULL
+                GROUP BY a.user_id
+                ORDER BY total_minutes DESC
+                LIMIT %s
+            """
+            
+            cursor.execute(query, (start_time, limit))
+            results = []
+            for i, row in enumerate(cursor.fetchall()):
+                # row = (user_id, total_minutes)
+                results.append((i+1, row[0], int(row[1])))
+            return results
+        except mysql.connector.Error as err:
+            print(f"[ERROR] Error getting top atcs: {err}")
+            return []
+        finally:
+            if cursor: cursor.close()
+            if conn: conn.close()
+
+
     # --- Cleanup Methods ---
 
     def prune_daily_data(self) -> bool:

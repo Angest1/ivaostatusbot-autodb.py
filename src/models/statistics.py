@@ -29,6 +29,9 @@ class Statistics:
     active_flights: Optional[List[Tuple]] = None  # (callsign, dep, arr, route, pob, aircraft)
     active_atcs: Optional[List[ATC]] = None
     metar: Optional[str] = None
+    top_airports: Optional[List[Tuple]] = None  # (airport, dep_count, arr_count)
+    top_pilots: Optional[List[Tuple]] = None # (count, user_id, mins)
+    top_atcs: Optional[List[Tuple]] = None # (count, user_id, mins)
     
     def to_dict(self) -> dict:
         """Convert to dictionary for compatibility."""
