@@ -243,8 +243,7 @@ class ChartService:
             ax.plot(x_smooth, pilots_smooth, color=color_primary, linewidth=2, label=label_pilots)
             self._fill_with_gradient(ax, x_smooth, pilots_smooth, color_primary)
             
-            ax.plot(x_smooth, atcs_smooth, color=color_atc, linewidth=2, linestyle="--", label=label_atcs)
-            # Missing fill for ATC in original code? No, line 196: self._fill_with_gradient(ax, x_smooth, atcs_smooth, color_atc)
+            ax.plot(x_smooth, atcs_smooth, color=color_atc, linewidth=2, label=label_atcs)
             self._fill_with_gradient(ax, x_smooth, atcs_smooth, color_atc)
             
             # Set limits
@@ -290,6 +289,14 @@ class ChartService:
                 for i in range(step, n, step):
                     ticks.append(i)
                     labels.append(times[i])
+                
+                if ticks[-1] != n - 1:
+                    if ticks[-1] > 0 and (n - 1 - ticks[-1]) < (step * 0.75):
+                        ticks.pop()
+                        labels.pop()
+                    
+                    ticks.append(n - 1)
+                    labels.append(times[n - 1])
             
             ax.set_xticks(ticks)
             ax.set_xticklabels(labels, rotation=45, fontsize=10, color="white", fontweight="bold")
@@ -302,7 +309,7 @@ class ChartService:
             
             # Grid and legend
             ax.grid(True, linewidth=0.3, alpha=0.3)
-            ax.legend(loc="upper left", frameon=False, prop={'weight': 'bold', 'size': 8})
+            ax.legend(loc="center left", frameon=False, prop={'weight': 'bold', 'size': 8})
             
             # Style spines
             for side, spine in ax.spines.items():
