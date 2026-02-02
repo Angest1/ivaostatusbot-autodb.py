@@ -9,10 +9,10 @@ import ctypes
 import gc
 from collections import defaultdict
 from datetime import datetime
+import threading
 from typing import Optional, List, Tuple
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
+from matplotlib.figure import Figure
+from matplotlib.backends.backend_agg import FigureCanvasAgg
 import matplotlib.ticker as mticker
 import numpy as np
 from matplotlib.colors import to_rgba
@@ -20,6 +20,7 @@ from matplotlib.path import Path
 from matplotlib.patches import PathPatch
 
 from ..config import Constants
+
 from ..config.settings import Settings
 from ..config.languages import get_text
 from ..models import Snapshot
@@ -33,6 +34,7 @@ class ChartService:
         self.db_service = db_service
         self._cache = {}
         self._cache_time = {}
+        self._lock = threading.Lock()
     
     def _fill_with_gradient(self, ax, x, y, color):
         """Fill area under curve with gradient."""
@@ -224,8 +226,19 @@ class ChartService:
         label_atcs = get_text(chart_lang, "presence_atcs")
  
         # Generate chart
-        with plt.style.context("dark_background"):
-            fig, ax = plt.subplots(figsize=(6, 1.75))
+        # Use thread lock to protect shared resources (like font cache)
+        # and use OO interface to avoid global state API (pyplot)
+        with self._lock:
+            # Create Figure (stateless)
+            fig = Figure(figsize=(6, 1.75))
+            fig.patch.set_facecolor("#1c1c1c")
+            
+            # Create canvas
+            FigureCanvasAgg(fig)
+            
+            # Add Axes
+            ax = fig.add_subplot(111)
+            ax.set_facecolor("#1c1c1c")
             
             x = np.arange(len(times))
             x_ext = np.insert(x, 0, 0)
@@ -312,10 +325,14 @@ class ChartService:
             ax.yaxis.set_major_locator(mticker.MaxNLocator(integer=True))
             for label in ax.get_yticklabels():
                 label.set_fontweight('bold')
+                label.set_color("white") # Re-apply white color manually
             
             # Grid and legend
             ax.grid(True, linewidth=0.3, alpha=0.3)
-            ax.legend(loc="center left", frameon=False, prop={'weight': 'bold', 'size': 8})
+            # Fix legend text color manually since we're not using style context
+            legend = ax.legend(loc="upper left", frameon=False, prop={'weight': 'bold', 'size': 8})
+            for text in legend.get_texts():
+                text.set_color("white")
             
             # Style spines
             for side, spine in ax.spines.items():
@@ -324,16 +341,13 @@ class ChartService:
                 else:
                     spine.set_visible(False)
             
-            # Background
-            fig.patch.set_facecolor("#1c1c1c")
-            ax.set_facecolor("#1c1c1c")
-            
             # Save
-            plt.margins(0)
-            plt.tight_layout(pad=0)
-            plt.savefig(output, dpi=300, transparent=True)
-            plt.close(fig)
-            gc.collect()
+            fig.set_tight_layout(True) # Ensure layout is tight
+            fig.tight_layout(pad=0)
+            fig.savefig(output, dpi=300, transparent=True)
+            
+            # Explicit clear (although not strictly needed if we drop ref)
+            fig.clear()
             
             # Force memory release on Linux
             if sys.platform == "linux":
@@ -341,6 +355,7 @@ class ChartService:
                     ctypes.CDLL('libc.so.6').malloc_trim(0)
                 except Exception:
                     pass
+
         
         # Update cache
         self._cache[cache_key] = output
