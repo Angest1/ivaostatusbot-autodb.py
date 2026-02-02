@@ -132,7 +132,13 @@ class Settings:
             "METAR_AIRPORT": "ICAO_CODE",
             "AIRPORT_NAME": "AIRPORT_NAME",
             "TIMEZONE": "REGION/TIMEZONE",
-            "NEXT_EVENT": ""
+            "NEXT_EVENT": "",
+            "SSH_ENABLED": False,
+            "SSH_HOST": "REMOTE_IP",
+            "SSH_PORT": 22,
+            "SSH_USER": "ubuntu",
+            "SSH_KEY_PATH": "path/to/key.pem",
+            "SSH_PASSWORD": ""
         }
         
         try:
@@ -275,9 +281,19 @@ class Settings:
         self.db_pool_name = "ivao_bot_pool"
         self.db_pool_size = 5
 
+        # SSH Configuration
+        self.ssh_enabled = config.get("SSH_ENABLED", False)
+        self.ssh_host = config.get("SSH_HOST")
+        self.ssh_port = config.get("SSH_PORT", 22)
+        self.ssh_user = config.get("SSH_USER")
+        self.ssh_password = config.get("SSH_PASSWORD")
+        self.ssh_key_path = config.get("SSH_KEY_PATH")
+
         # Validate Database Config
         # We check for at least one valid DB configuration or all three depending on strictness.
         # The plan implies we need all three.
+        # Note: If SSH is enabled, DB_HOST should likely be 127.0.0.1 (or localhost) in config, 
+        # but we don't strictly enforce that here to allow flexibility.
         if not all([self.db_host, self.db_port, self.db_name, self.db_user, self.db_password]):
             msg = f"[ERROR] {self.config_file} is missing required Database fields (DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD)."
             print(msg)

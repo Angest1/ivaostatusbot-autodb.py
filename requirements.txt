@@ -3,3 +3,5 @@ aiohttp
 numpy
 matplotlib
 mysql-connector-python
+sshtunnel
+paramiko<3.0

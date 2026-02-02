@@ -4,6 +4,13 @@ import sys
 import os
 import asyncio
 import ctypes
+import warnings
+# Suppress CryptographyDeprecationWarning from paramiko/sshtunnel interactions
+try:
+    from cryptography.utils import CryptographyDeprecationWarning
+    warnings.filterwarnings("ignore", category=CryptographyDeprecationWarning)
+except ImportError:
+    pass
 
 # Add project root to sys.path to allow absolute imports from src
 current_dir = os.path.dirname(os.path.abspath(__file__))

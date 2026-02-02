@@ -9,6 +9,7 @@ from typing import List, Optional, Iterator, Generator, Any, Dict
 from datetime import datetime
 from ..config.settings import Settings
 from ..models import Snapshot, Pilot, ATC, FlightPlan
+from sshtunnel import SSHTunnelForwarder
 
 class DatabaseService:
     _instance = None
@@ -25,19 +26,57 @@ class DatabaseService:
             return
             
         self._initialized = True
+        self.settings = Settings()
+        
+        # Default to direct connection settings
+        self.db_host = self.settings.db_host
+        self.db_port = self.settings.db_port
+        
+        # Initialize SSH Tunnel if enabled
+        self.tunnel = None
+        if self.settings.ssh_enabled:
+            print(f"[DB] SSH Tunneling Enabled. Connecting to {self.settings.ssh_host}...")
+            try:
+                ssh_args = {
+                    "ssh_address_or_host": (self.settings.ssh_host, self.settings.ssh_port),
+                    "ssh_username": self.settings.ssh_user,
+                    "remote_bind_address": (self.settings.db_host, self.settings.db_port),
+                    "local_bind_address": ('127.0.0.1', 0) # 0 means random available port
+                }
+                
+                if self.settings.ssh_key_path:
+                    ssh_args["ssh_pkey"] = self.settings.ssh_key_path
+                elif self.settings.ssh_password:
+                     ssh_args["ssh_password"] = self.settings.ssh_password
+                
+                self.tunnel = SSHTunnelForwarder(**ssh_args)
+                self.tunnel.start()
+                
+                print(f"[DB] SSH Tunnel Established. Local Bind: 127.0.0.1:{self.tunnel.local_bind_port}")
+                
+                # Update DB Connection details to use the tunnel
+                self.db_host = '127.0.0.1'
+                self.db_port = self.tunnel.local_bind_port
+            except Exception as e:
+                print(f"[ERROR] SSH Tunnel Connection Failed: {e}")
+                # We optionally fail here or let the DB connection try (and likely fail)
+        else:
+            self.db_host = self.settings.db_host
+            self.db_port = self.settings.db_port
+
         msg = "Initializing Database Pool..."
         print(f"[DB] {msg}")
-        self.settings = Settings()
+        
         try:
             self.connection_pool = mysql.connector.pooling.MySQLConnectionPool(
                 pool_name=self.settings.db_pool_name,
                 pool_size=self.settings.db_pool_size,
                 pool_reset_session=True,
-                host=self.settings.db_host,
+                host=self.db_host, # Use the tunnel host (localhost) or original
                 database=self.settings.db_name,
                 user=self.settings.db_user,
                 password=self.settings.db_password,
-                port=self.settings.db_port,
+                port=self.db_port, # Use the tunnel port or original
                 charset='utf8mb4'
             )
             print("[DB] Database Pool Initialized.")

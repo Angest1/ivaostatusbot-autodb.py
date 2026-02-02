@@ -416,10 +416,15 @@ class EmbedBuilder:
                 time_str = format_hours_minutes(minutes)
                 
                 embed.add_field(
-                    name=f"{medal}✈️ {uid}",
-                    value=f"({time_str})",
+                    name=f"{medal} {uid}",
+                    value=f"✈️ ({time_str})",
                     inline=True
                 )
+            
+            # Fill with empty fields if less than 3 to maintain column alignment
+            if limit < 3:
+                for _ in range(3 - limit):
+                    embed.add_field(name='\u200b', value='\u200b', inline=True)
         
         # 2. Top ATCs Section
         if stats.top_atcs:
@@ -435,12 +440,46 @@ class EmbedBuilder:
                 time_str = format_hours_minutes(minutes)
                 
                 embed.add_field(
-                    name=f"{medal}📡 {uid}",
-                    value=f"({time_str})",
+                    name=f"{medal} {uid}",
+                    value=f"📡 ({time_str})",
                     inline=True
                 )
+            
+            # Fill with empty fields if less than 3 to maintain column alignment
+            if limit < 3:
+                for _ in range(3 - limit):
+                    embed.add_field(name='\u200b', value='\u200b', inline=True)
+
+        # Footer with Top Airports if available
+        footer_text = get_text(self.settings.lang, "footer", heart="❤️")
+        
+        if stats.top_airports:
+            # Use simplified formatter for historical reports
+            top_airports_text = self._format_top_airports_simple(stats.top_airports)
+            if top_airports_text:
+                footer_text = top_airports_text
+
+        embed.set_footer(text=footer_text)
 
         return embed
+
+    def _format_top_airports_simple(self, top_airports: List[Tuple]) -> str:
+        if not top_airports:
+            return ""
+            
+        parts = []
+        medals = ["🥇", "🥈", "🥉"]
+        
+        for i, (airport, dep_count, arr_count) in enumerate(top_airports):
+            if i >= 3: break
+            
+            medal = medals[i]
+            total = dep_count + arr_count
+            
+            entry = f"{medal} {airport}: {total}"
+            parts.append(entry)
+            
+        return "  | ".join(parts)
 
     def _format_top_airports_footer(self, top_airports: List[Tuple]) -> str:
         """Format top airports list for footer."""
@@ -486,7 +525,6 @@ class EmbedBuilder:
             medal = medals[i]
             time_str = format_hours_minutes(minutes)
             
-            # Format: 🥇 USERID: 0h 0m
             lines.append(f"{medal} {user_id}: {time_str}")
             
         return " |".join(lines)
