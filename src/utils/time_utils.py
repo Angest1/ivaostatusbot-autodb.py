@@ -8,7 +8,7 @@ def format_hours_minutes(total_minutes: float) -> str:
     """Format minutes as 'Xh Ym'."""
     hours = int(total_minutes // 60)
     minutes = int(total_minutes % 60)
-    return f"{hours}h {minutes}m"
+    return f"{hours:02d}:{minutes:02d}"
 
 def time_remaining(target_datetime: datetime) -> str:
     """Calculate time remaining until target datetime."""

@@ -400,26 +400,46 @@ class EmbedBuilder:
             inline=True
         )
         
-        # Build Consolidated Footer
-        footer_parts = []
+        # Top 3 Pilots and ATCs (Title merged into columns to avoid gap)
+        medals = ["🥇", "🥈", "🥉"]
         
-        # 2. Top Pilots
+        # 1. Top Pilots Section
         if stats.top_pilots:
-            formatted_pilots = self._format_top_users(stats.top_pilots, "🥇", "🥈", "🥉")
-            if formatted_pilots:
-                pilot_label = get_text(self.settings.lang, 'pilots').replace("👨‍✈️ ", "").strip()
-                footer_parts.append(f"TOP {pilot_label}:\n{formatted_pilots}")
-
-        # 3. Top ATCs
-        if stats.top_atcs:
-            formatted_atcs = self._format_top_users(stats.top_atcs, "🥇", "🥈", "🥉")
-            if formatted_atcs:
-                atc_label = get_text(self.settings.lang, 'controllers').replace("📡 ", "").strip()
-                footer_parts.append(f"TOP {atc_label}:\n{formatted_atcs}")
-
-        if footer_parts:
-            embed.set_footer(text="\n".join(footer_parts))
+            raw_header = get_text(self.settings.lang, 'pilots')
+            header = raw_header.replace("👨‍✈️", "").strip()
+            
+            # Columns
+            limit = min(3, len(stats.top_pilots))
+            for i in range(limit):
+                rank_idx, uid, minutes = stats.top_pilots[i]
+                medal = medals[i]
+                time_str = format_hours_minutes(minutes)
+                
+                embed.add_field(
+                    name=f"{medal}✈️ {uid}",
+                    value=f"({time_str})",
+                    inline=True
+                )
         
+        # 2. Top ATCs Section
+        if stats.top_atcs:
+            raw_header = get_text(self.settings.lang, 'controllers')
+            header = raw_header.replace("📡", "").strip()
+            
+            
+            # Columns
+            limit = min(3, len(stats.top_atcs))
+            for i in range(limit):
+                rank_idx, uid, minutes = stats.top_atcs[i]
+                medal = medals[i]
+                time_str = format_hours_minutes(minutes)
+                
+                embed.add_field(
+                    name=f"{medal}📡 {uid}",
+                    value=f"({time_str})",
+                    inline=True
+                )
+
         return embed
 
     def _format_top_airports_footer(self, top_airports: List[Tuple]) -> str:

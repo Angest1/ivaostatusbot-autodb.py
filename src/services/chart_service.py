@@ -315,7 +315,7 @@ class ChartService:
             
             # Grid and legend
             ax.grid(True, linewidth=0.3, alpha=0.3)
-            ax.legend(loc="upper left", frameon=False, prop={'weight': 'bold', 'size': 8})
+            ax.legend(loc="center left", frameon=False, prop={'weight': 'bold', 'size': 8})
             
             # Style spines
             for side, spine in ax.spines.items():
