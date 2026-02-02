@@ -329,8 +329,14 @@ class ChartService:
             
             # Grid and legend
             ax.grid(True, linewidth=0.3, alpha=0.3)
+            
+            # Determine legend location
+            legend_loc = "upper left"
+            if chart_type in ("weekly", "monthly"):
+                legend_loc = "center left"
+            
             # Fix legend text color manually since we're not using style context
-            legend = ax.legend(loc="upper left", frameon=False, prop={'weight': 'bold', 'size': 8})
+            legend = ax.legend(loc=legend_loc, frameon=False, prop={'weight': 'bold', 'size': 8})
             for text in legend.get_texts():
                 text.set_color("white")
             
