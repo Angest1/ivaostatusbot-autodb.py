@@ -32,7 +32,7 @@ class IVAOBot(commands.Bot):
         intents.message_content = True
         intents.guilds = True
         
-        super().__init__(command_prefix="!", intents=intents)
+        super().__init__(command_prefix="!", intents=intents, max_messages=None)
         
         # HTTP session
         self.http_session: aiohttp.ClientSession = None
